@@ -2,7 +2,7 @@
 Simple 2d world where the player can interact with the items in the world.
 """
 
-__author__ = "44431796"
+__author__ = "Juan Espares: 44317962" 
 __date__ = "3/10/2019" 
 __version__ = "1.1.0"
 __copyright__ = "The University of Queensland, 2019"
@@ -10,7 +10,10 @@ __copyright__ = "The University of Queensland, 2019"
 import math
 import tkinter as tk
 
+
 from typing import Tuple, List
+from tkinter import messagebox , filedialog
+
 
 import pymunk
 
@@ -20,6 +23,7 @@ from game.mob import Mob, CloudMob, Fireball
 from game.item import DroppedItem, Coin
 from game.view import GameView, ViewRenderer
 from game.world import World
+
 
 from level import load_world, WorldBuilder
 from player import Player
@@ -48,6 +52,12 @@ MOBS = {
     '&': "cloud"
 }
 
+def main(): 
+    root = tk.Tk() 
+    app = MarioApp(root)
+    root.title("Mario")
+    root.iconbitmap(r'favicon.ico')
+    root.mainloop() 
 
 def create_block(world: World, block_id: str, x: int, y: int, *args):
     """Create a new block instance and add it to the world based on the block_id.
@@ -174,6 +184,7 @@ class MarioApp:
         world_builder.register_builders(ITEMS.keys(), create_item)
         world_builder.register_builders(MOBS.keys(), create_mob)
         self._builder = world_builder
+        self._text = tk.Text(self._master)
 
         self._player = Player(max_health=5)
         self.reset_world('level1.txt')
@@ -183,12 +194,35 @@ class MarioApp:
         size = tuple(map(min, zip(MAX_WINDOW_SIZE, self._world.get_pixel_size())))
         self._view = GameView(master, size, self._renderer)
         self._view.pack()
-
         self.bind()
+        #Create a menu bar 
+        menubar = tk.Menu(self._master)
+        self._master.config(menu = menubar)
+        filemenu = tk.Menu(menubar)
+        menubar.add_cascade(label='File', menu = filemenu)
+        filemenu.add_command(label = 'Load Level', command = self.load_file)
+        filemenu.add_command(label = 'Reset Level', command = self.reset_world('level1.txt'), )
+        filemenu.add_command(label = 'Exit', command = self.quit)
 
         # Wait for window to update before continuing
         master.update_idletasks()
         self.step()
+
+    def load_file(self): 
+        filename = filedialog.askopenfilename() 
+        if filename: 
+            self._filename = filename 
+            self._master.title(self._filename)
+            directory = open(filename, 'r')
+            self._text.insert(tk.INSERT, directory.read())
+            directory.close() 
+
+    def quit(self): 
+        confirm = messagebox.askokcancel('Quit', 'Are you sure you want to quit?')
+        if confirm: 
+            self._master.destroy() 
+
+    
 
     def reset_world(self, new_level):
         self._world = load_world(self._builder, new_level)
@@ -199,8 +233,23 @@ class MarioApp:
 
     def bind(self):
         """Bind all the keyboard events to their event handlers."""
-        pass
+        #Jumping 
+        self._master.bind('<w>', lambda e: self._jump())
+        self._master.bind('<Up>', lambda e: self._jump())
+        self._master.bind('<space>', lambda e: self._jump())  
+        
+        #Left and Right 
+        self._master.bind('<a>', lambda e: self._move(-100, 20))
+        self._master.bind('<Left>', lambda e: self._move(-100, 20) )  
+        
+        self._master.bind('<d>', lambda e: self._move(100, 20))
+        self._master.bind('<Right>', lambda e: self._move(100, 20))
 
+        #Duck 
+        self._master.bind('<s>', lambda e: self._duck() )
+        self._master.bind('<Down>', lambda e: self._duck() )
+
+            
     def redraw(self):
         """Redraw all the entities in the game canvas."""
         self._view.delete(tk.ALL)
@@ -238,13 +287,28 @@ class MarioApp:
         self._master.after(10, self.step)
 
     def _move(self, dx, dy):
-        pass
+        plyr_velocity = tuple((dx,dy))
+        self._player.set_velocity(plyr_velocity)
+        
+
 
     def _jump(self):
-        pass
+        velocity_current = self._player.get_velocity()
+        velocity_current_list = list(velocity_current) 
+        velocity_current_list[1] -= 160
+        velocity_current = tuple(velocity_current_list)
+        self._player.set_velocity(velocity_current)
+        self._player.set_jumping(True)
+             
+    def _duck(self):   #Need to fix when pipes are implemented.  
+        velocity_current = self._player.get_velocity()
+        velocity_current_list = list(velocity_current) 
+        velocity_current_list[1] += 160
+        velocity_current = tuple(velocity_current_list)
+        self._player.set_velocity(velocity_current)
+        self._player.set_jumping(False)
 
-    def _duck(self):
-        pass
+        
 
     def _setup_collision_handlers(self):
         self._world.add_collision_handler("player", "item", on_begin=self._handle_player_collide_item)
@@ -313,3 +377,11 @@ class MarioApp:
                                       arbiter: pymunk.Arbiter) -> bool:
         return True
 
+
+if __name__ == "__main__": 
+    main() 
+
+
+
+
+  
