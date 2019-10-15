@@ -25,7 +25,7 @@ from game.view import GameView, ViewRenderer
 from game.world import World
 
 
-from level import load_world, WorldBuilder
+from level import load_world, WorldBuilder , load_level
 from player import Player
 
 BLOCK_SIZE = 2 ** 4
@@ -51,14 +51,7 @@ ITEMS = {
 MOBS = {
     '&': "cloud"
 }
-
-def main(): 
-    root = tk.Tk() 
-    app = MarioApp(root)
-    root.title("Mario")
-    root.iconbitmap(r'favicon.ico')
-    root.mainloop() 
-
+  
 def create_block(world: World, block_id: str, x: int, y: int, *args):
     """Create a new block instance and add it to the world based on the block_id.
 
@@ -195,29 +188,85 @@ class MarioApp:
         self._view = GameView(master, size, self._renderer)
         self._view.pack()
         self.bind()
-        #Create a menu bar 
+        
+
+        
+    
+        #Call Health and Score Status 
+        self._statusDisplay = StatusDisplay(master, size)
+        self._statusDisplay.pack(fill = tk.X )
+
+        #Retrieve player health and score and pass it to StatusDisplay class. 
+        
+        
+        
+        
+        
+        #Menubar function  
+        self.file_menubar() 
+
+        # Wait for window to update before continuing
+        master.update_idletasks()
+        self.step()
+        
+        
+
+
+
+    def file_menubar(self): 
+        ''' Creates a menubar ''' 
         menubar = tk.Menu(self._master)
         self._master.config(menu = menubar)
         filemenu = tk.Menu(menubar)
         menubar.add_cascade(label='File', menu = filemenu)
         filemenu.add_command(label = 'Load Level', command = self.load_file)
-        filemenu.add_command(label = 'Reset Level', command = self.reset_world('level1.txt'), )
+        filemenu.add_command(label = 'Reset Level', command = self.reset_level)
         filemenu.add_command(label = 'Exit', command = self.quit)
 
-        # Wait for window to update before continuing
-        master.update_idletasks()
-        self.step()
+        #Restart or exit game level if player has no health left. 
+        
+            
+        
+    def popup_end(self): 
+        ''' popup function that gives user the option to restart or quit game upon death. 
+        (i.e. Score = 0 )
+
+        ''' 
+        popup = tk.Tk() 
+
+        def leavepop(): 
+            popup.destroy() 
+            self.reset_world('level1.txt')
+
+        popup.wm_title (' Game Over !')
+        label1 = tk.Label(popup, text = 'Restart or Quit ?')
+        label1.pack()
+        b1 = tk.Button(popup, text = 'Restart' , command = leavepop)
+        b2 = tk.Button(popup, text = 'Quit' , command = self.quit)
+        b1.pack() 
+        b2.pack() 
+        popup.mainloop() 
 
     def load_file(self): 
+        ''' loads file requested ''' 
         filename = filedialog.askopenfilename() 
-        if filename: 
-            self._filename = filename 
-            self._master.title(self._filename)
-            directory = open(filename, 'r')
-            self._text.insert(tk.INSERT, directory.read())
-            directory.close() 
+        try: 
+            self.reset_world(filename)
+
+        except FileNotFoundError: 
+            print(' File not found ')
+        
+       
+    def reset_level(self): 
+        ''' resets game to level 1 ''' 
+       
+        self._player.change_score(-(self._player.get_score()))
+        maxhealth = self._player.get_max_health() 
+        self._player.change_health(maxhealth)
+        self.reset_world('level1.txt')
 
     def quit(self): 
+        ''' Option to quit the game and terminate program.  ''' 
         confirm = messagebox.askokcancel('Quit', 'Are you sure you want to quit?')
         if confirm: 
             self._master.destroy() 
@@ -239,17 +288,16 @@ class MarioApp:
         self._master.bind('<space>', lambda e: self._jump())  
         
         #Left and Right 
-        self._master.bind('<a>', lambda e: self._move(-100, 20))
-        self._master.bind('<Left>', lambda e: self._move(-100, 20) )  
+        self._master.bind('<a>', lambda e: self._move(-80, 0))
+        self._master.bind('<Left>', lambda e: self._move(-80, 0) )  
         
-        self._master.bind('<d>', lambda e: self._move(100, 20))
-        self._master.bind('<Right>', lambda e: self._move(100, 20))
+        self._master.bind('<d>', lambda e: self._move(80, 0))
+        self._master.bind('<Right>', lambda e: self._move(80, 0))
 
         #Duck 
         self._master.bind('<s>', lambda e: self._duck() )
         self._master.bind('<Down>', lambda e: self._duck() )
 
-            
     def redraw(self):
         """Redraw all the entities in the game canvas."""
         self._view.delete(tk.ALL)
@@ -280,27 +328,52 @@ class MarioApp:
         """Step the world physics and redraw the canvas."""
         data = (self._world, self._player)
         self._world.step(data)
+        
+        plyr_health = self._player.get_health()
+        plyr_score = self._player.get_score() 
+        max_health = self._player.get_max_health() 
+        score_update = StatusDisplay.set_score(self._player, plyr_score)
+        health_update = StatusDisplay.set_health(self._player, plyr_health)
+        
+        self._statusDisplay.update_bar(health_update, score_update, max_health)
+
+        if plyr_health < 1 : 
+            self.popup_end()
 
         self.scroll()
         self.redraw()
 
         self._master.after(10, self.step)
+        
+
 
     def _move(self, dx, dy):
+        '''Moves player left or right 
+            Parameters: 
+                dx, dy <int> : the velocity of player moving. 
+        
+        ''' 
         plyr_velocity = tuple((dx,dy))
         self._player.set_velocity(plyr_velocity)
         
 
 
     def _jump(self):
-        velocity_current = self._player.get_velocity()
-        velocity_current_list = list(velocity_current) 
-        velocity_current_list[1] -= 160
-        velocity_current = tuple(velocity_current_list)
-        self._player.set_velocity(velocity_current)
-        self._player.set_jumping(True)
+        ''' Makes player jump. ''' 
+        jump_check = self._player.is_jumping() 
+        if jump_check == False: 
+            velocity_current = self._player.get_velocity()
+            velocity_current_list = list(velocity_current) 
+            velocity_current_list[1] -= 150
+            velocity_current = tuple(velocity_current_list)
+            self._player.set_velocity(velocity_current)
+            self._player.set_jumping(True)
+        else: 
+            self._player.set_jumping(False) 
              
     def _duck(self):   #Need to fix when pipes are implemented.  
+        ''' Makes player crouch.
+        '''  
         velocity_current = self._player.get_velocity()
         velocity_current_list = list(velocity_current) 
         velocity_current_list[1] += 160
@@ -377,9 +450,66 @@ class MarioApp:
                                       arbiter: pymunk.Arbiter) -> bool:
         return True
 
+class StatusDisplay(tk.Frame):
+    ''' Initialise frame with a frame inside of it. ''' 
+    def __init__(self, parent, size):
+        width , height = size 
+        super().__init__(parent , width = width , height= height)
+        
+        #Creates a black frame and packs healthbar frame on it.  
+        self._blackframe = tk.Frame(self, bg= 'black', height = 20)
+        self._healthbar = tk.Frame(self._blackframe, bg = 'green', height = 20)
+        
+        score = 0  
+        self._scorelabel = tk.Label(self, text = 'Score: ' + str(score))
+        self._blackframe.pack(fill = tk.X)
+
+        self._healthbar.pack(side = 'left')
+        self._scorelabel.pack() 
+
+    def set_health(self,health):
+        health = self._health  
+        return self._health
+        
+    def set_score(self,score):
+        score = self._score 
+        return self._score 
+
+
+    def update_bar(self, health , score , max_health):    
+        health_percentage = (health / max_health)
+        new_width = ( health_percentage * int(self.winfo_width()))
+
+        if health_percentage >0.5: 
+            self._healthbar.config(bg ='green', width =int(new_width)  )
+                  
+        elif health_percentage > 0.25 and health_percentage <= 0.5: 
+            self._healthbar.config(bg = 'orange', width = int(new_width))
+            
+        elif health_percentage <0.25: 
+            self._healthbar.config(bg = 'red', width= int(new_width))
+
+        self._scorelabel.config( text = 'Score: ' + str(score))
+
+
+
+
+class BounceBlock(Block): 
+    def __init__(self): 
+        super().__init__()  
+
+
+
+         
+            
 
 if __name__ == "__main__": 
-    main() 
+
+    root = tk.Tk() 
+    app = MarioApp(root)
+    root.title("Mario")
+    root.iconbitmap(r'favicon.ico')
+    root.mainloop()  
 
 
 
