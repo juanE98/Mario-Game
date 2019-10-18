@@ -104,6 +104,7 @@ class MysteryBlock(Block):
             # Drop items into the game world
             drops = self.get_drops()
             self._drop_items(data[0], drops)
+            
 
     def is_active(self) -> bool:
         """(bool): Returns true if the block has not yet dropped items."""

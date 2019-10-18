@@ -9,6 +9,8 @@ from typing import Tuple, Callable, Iterable
 from game.world import World
 
 
+
+
 class WorldBuilder:
     """World builder class that can be used to construct a world from
     entity ids by dynamically assigning processors to ids.
@@ -36,6 +38,7 @@ class WorldBuilder:
         self._gravity = gravity
         self._width = 0
         self._height = 0
+        
 
     def register_builder(self, entity_id: str, builder: Callable):
         """Register a new builder process for an entity id.
